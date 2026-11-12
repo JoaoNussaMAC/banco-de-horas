@@ -1,5 +1,5 @@
 // Guarda os arquivos do app para funcionar sem internet.
-const CACHE = 'banco-de-horas-v2';
+const CACHE = 'banco-de-horas-v3';
 const FILES = [
   './',
   './index.html',
@@ -27,7 +27,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-cache' })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
