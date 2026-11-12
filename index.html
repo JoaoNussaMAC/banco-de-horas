@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Banco de Horas</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ponto">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F5F6F8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B0D12" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root {
+  --bg: #F5F6F8; --card: #FFFFFF; --text: #111827; --muted: #4B5563; --faint: #6B7280;
+  --line: #E5E7EB; --soft: #F9FAFB; --accent: #2563EB; --accent-soft: #DBEAFE;
+  --ok: #15803D; --ok-bg: #E8F7EE; --warn: #C2410C; --warn-dot: #EA580C; --warn-bg: #FFF1E6;
+  --danger: #B91C1C; --shadow: 0 1px 2px rgba(17,24,39,0.06);
+  --nav-h: 64px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0B0D12; --card: #171A21; --text: #F3F4F6; --muted: #A3AAB8; --faint: #8B93A3;
+    --line: #2A2F3A; --soft: #10131A; --accent: #3B82F6; --accent-soft: #1E3A8A;
+    --ok: #4ADE80; --ok-bg: #12301E; --warn: #FB923C; --warn-dot: #FB923C; --warn-bg: #3A2213;
+    --danger: #F87171; --shadow: none;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; min-height: 100vh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.num { font-variant-numeric: tabular-nums; }
+main { max-width: 520px; margin: 0 auto; padding: 20px 16px calc(var(--nav-h) + env(safe-area-inset-bottom) + 24px); display: flex; flex-direction: column; gap: 16px; }
+.screen[hidden] { display: none !important; }
+.screen { display: flex; flex-direction: column; gap: 16px; }
+h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.sub { margin: 0; font-size: 15px; color: var(--muted); font-weight: 500; }
+.card { background: var(--card); border-radius: 20px; padding: 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 12px; }
+.label { font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 16px; }
+.row .v { font-weight: 600; }
+.muted { color: var(--muted); }
+
+/* Ponto */
+.punch { align-items: center; padding: 26px 20px; gap: 18px; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--soft); color: var(--muted); }
+.pill.on { background: var(--ok-bg); color: var(--ok); }
+.pill.on::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.big { font-size: 52px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; text-align: center; }
+.punch-btn { width: 196px; height: 196px; border-radius: 50%; border: none; background: var(--accent); color: #fff; font-size: 21px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 12px 28px rgba(37,99,235,0.30); transition: transform .12s; }
+.punch-btn:active { transform: scale(0.96); }
+.punch-btn.out { background: #111827; box-shadow: 0 12px 28px rgba(17,24,39,0.25); }
+@media (prefers-color-scheme: dark) { .punch-btn.out { background: #F3F4F6; color: #111827; } }
+.punch-btn:disabled { background: var(--line); color: var(--muted); box-shadow: none; }
+.hint { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+.bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar > div { height: 100%; border-radius: 999px; background: var(--accent); transition: width .3s; }
+.bar.done > div { background: var(--ok); }
+.bar.low > div { background: var(--warn-dot); }
+.goal-n { font-size: 26px; font-weight: 700; }
+
+/* Calendário */
+.cal-head { display: flex; align-items: center; justify-content: space-between; }
+.icon-btn { width: 44px; height: 44px; border-radius: 50%; border: none; background: var(--card); display: inline-flex; align-items: center; justify-content: center; box-shadow: var(--shadow); }
+.weekdays, .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; }
+.weekdays { font-size: 12px; font-weight: 600; color: var(--faint); padding-bottom: 4px; }
+.grid { row-gap: 4px; }
+.day { height: 58px; margin: 0 2px; border-radius: 12px; border: none; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 0; }
+.day .n { font-size: 15px; font-weight: 500; }
+.day .h { font-size: 10px; font-weight: 600; color: var(--ok); }
+.day .h.short { color: var(--warn); }
+.day .dot { width: 5px; height: 5px; border-radius: 50%; }
+.day .dot.on { background: var(--warn-dot); }
+.day.we .n { color: var(--faint); }
+.day.today .n { color: var(--accent); font-weight: 700; }
+.day.sel { background: var(--accent); }
+.day.sel .n, .day.sel .h { color: #fff; }
+.day.sel .dot.on { background: #fff; }
+.day.blank { visibility: hidden; }
+.field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.field label { font-size: 13px; font-weight: 600; color: var(--muted); }
+input[type=time], input[type=number], textarea { width: 100%; border: 1px solid var(--line); background: var(--soft); border-radius: 12px; padding: 10px 12px; font-size: 16px; }
+textarea { resize: vertical; min-height: 84px; }
+.two { display: flex; gap: 12px; }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 16px; min-height: 44px; }
+.switch input { width: 22px; height: 22px; accent-color: var(--accent); }
+.link-btn { border: none; background: none; color: var(--danger); font-size: 15px; font-weight: 600; padding: 10px 0; align-self: flex-start; }
+.upnote { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border-radius: 14px; padding: 12px 14px; border: none; text-align: left; width: 100%; box-shadow: var(--shadow); }
+.upnote b { font-size: 13px; color: var(--warn); min-width: 48px; padding-top: 1px; }
+.upnote span { font-size: 15px; white-space: pre-line; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* Relatórios */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; font-weight: 500; text-transform: capitalize; }
+.chip.on { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat span:first-child { font-size: 13px; color: var(--muted); font-weight: 500; }
+.stat span:last-child { font-size: 24px; font-weight: 700; }
+.primary { height: 54px; border-radius: 16px; border: none; background: var(--accent); color: #fff; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.list { background: var(--card); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); }
+.list > * + * { border-top: 1px solid var(--line); }
+.item { min-height: 58px; padding: 10px 16px; border: none; background: transparent; width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; }
+.item .t { display: flex; flex-direction: column; flex: 1; }
+.item .t b { font-size: 16px; }
+.item .t small { font-size: 13px; color: var(--muted); }
+.item input[type=number] { width: 90px; text-align: right; }
+
+/* Barra de navegação */
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 6px 12px env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); z-index: 5; }
+nav.tabs button { border: none; background: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0 8px; font-size: 12px; font-weight: 500; color: var(--faint); }
+nav.tabs button.on { color: var(--accent); font-weight: 600; }
+
+/* Avisos */
+.overlay { position: fixed; inset: 0; background: rgba(17,24,39,0.45); display: flex; align-items: flex-end; justify-content: center; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); z-index: 10; }
+.overlay[hidden] { display: none; }
+.sheet { background: var(--card); width: 100%; max-width: 480px; border-radius: 24px; padding: 22px 20px; display: flex; flex-direction: column; gap: 14px; animation: up .22s ease-out; }
+@keyframes up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sheet .ic { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+.sheet p { margin: 0; font-size: 16px; line-height: 1.45; color: var(--muted); }
+.sheet p strong { color: var(--text); }
+.sheet .primary { background: var(--text); color: var(--bg); }
+.toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; z-index: 20; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <!-- PONTO -->
+  <section class="screen" id="s-ponto">
+    <div>
+      <p class="sub" id="today-label"></p>
+      <h1 id="greet">Olá</h1>
+    </div>
+    <div class="card punch">
+      <span class="pill" id="status-pill">Fora do expediente</span>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        <span class="big num" id="today-total">0h 00</span>
+        <span class="muted" style="font-size:14px">trabalhadas hoje (já sem a 1h de almoço)</span>
+      </div>
+      <button class="punch-btn" id="punch-btn" type="button">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span id="punch-label">Bater entrada</span>
+      </button>
+      <p class="hint" id="punch-hint">Toque uma vez para registrar. Dá para corrigir o horário no Calendário.</p>
+    </div>
+    <div class="card">
+      <div class="row"><span class="label" id="goal-title">Meta do mês</span><span class="muted" style="font-size:13px;font-weight:500" id="goal-left"></span></div>
+      <div style="display:flex;align-items:baseline;gap:6px"><span class="goal-n num" id="goal-done">0h</span><span class="muted" id="goal-of">de 100h</span></div>
+      <div class="bar" id="goal-bar"><div style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <span class="label">Hoje</span>
+      <div class="row"><span>Entrada</span><span class="v num" id="t-in">—</span></div>
+      <div class="row muted"><span>Almoço (automático)</span><span class="num" id="t-lunch">−1h</span></div>
+      <div class="row"><span>Saída</span><span class="v num" id="t-out">—</span></div>
+    </div>
+  </section>
+
+  <!-- CALENDÁRIO -->
+  <section class="screen" id="s-cal" hidden>
+    <div class="cal-head">
+      <h1 id="cal-title" style="text-transform:capitalize;font-size:26px"></h1>
+      <div style="display:flex;gap:8px">
+        <button class="icon-btn" id="cal-prev" type="button" aria-label="Mês anterior"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <button class="icon-btn" id="cal-next" type="button" aria-label="Próximo mês"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+    </div>
+    <div class="card" style="padding:12px 8px;gap:4px">
+      <div class="weekdays"><span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span></div>
+      <div class="grid" id="cal-grid"></div>
+    </div>
+    <div class="card" id="day-card">
+      <div class="row"><h2 id="day-title"></h2><span class="muted num" style="font-size:14px" id="day-total"></span></div>
+      <div class="two">
+        <div class="field"><label for="d-in">Entrada</label><input type="time" id="d-in"></div>
+        <div class="field"><label for="d-out">Saída</label><input type="time" id="d-out"></div>
+      </div>
+      <label class="switch" for="d-lunch"><span>Descontar 1h de almoço</span><input type="checkbox" id="d-lunch" checked></label>
+      <div class="field"><label for="d-note">Anotações do dia</label><textarea id="d-note" placeholder="Ex.: levar documento no RH"></textarea></div>
+      <button class="link-btn" id="d-clear" type="button">Apagar horários deste dia</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px" id="up-wrap">
+      <span class="label" style="padding:0 4px">Próximas anotações</span>
+      <div style="display:flex;flex-direction:column;gap:8px" id="up-list"></div>
+    </div>
+  </section>
+
+  <!-- RELATÓRIOS -->
+  <section class="screen" id="s-rel" hidden>
+    <h1>Relatórios</h1>
+    <div class="chips" id="chips"></div>
+    <div class="card" style="padding:20px;gap:16px">
+      <div class="stats">
+        <div class="stat"><span>Dias trabalhados</span><span class="num" id="r-days">0</span></div>
+        <div class="stat"><span>Horas no mês</span><span class="num" id="r-total">0h</span></div>
+        <div class="stat"><span>Almoço descontado</span><span class="num" id="r-lunch">0h</span></div>
+        <div class="stat"><span id="r-diff-l">Falta para a meta</span><span class="num" id="r-diff">0h</span></div>
+      </div>
+      <button class="primary" id="r-xlsx" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        <span id="r-xlsx-l">Gerar planilha</span>
+      </button>
+      <p class="hint">Arquivo Excel (.xlsx) com data, entrada, saída, almoço e total de cada dia, as anotações e o resumo da meta.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span class="label" style="padding:0 4px">Seus dados</span>
+      <div class="list">
+        <button class="item" id="b-backup" type="button">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 16.5A4.5 4.5 0 0 0 17.5 8h-1A7 7 0 1 0 4 14.9"/><path d="M12 12v9M8 16l4-4 4 4"/></svg>
+          <span class="t"><b>Fazer backup</b><small id="b-last">Nenhum backup ainda</small></span>
+        </button>
+        <button class="item" id="b-restore" type="button">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          <span class="t"><b>Restaurar backup</b><small>Substitui os dados atuais pelos do arquivo</small></span>
+        </button>
+        <label class="item" for="set-goal">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+          <span class="t"><b>Meta mensal (horas)</b><small>Almoço de 1h descontado automaticamente</small></span>
+          <input type="number" id="set-goal" min="1" max="400" step="1" inputmode="numeric">
+        </label>
+        <label class="item" for="set-low">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+          <span class="t"><b>Avisar abaixo de (horas)</b><small>Quando faltarem 2 semanas para o fim do mês</small></span>
+          <input type="number" id="set-low" min="0" max="400" step="1" inputmode="numeric">
+        </label>
+      </div>
+      <input type="file" id="restore-file" accept=".json,application/json" hidden>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Seções">
+  <button type="button" data-tab="ponto" class="on">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Ponto
+  </button>
+  <button type="button" data-tab="cal">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendário
+  </button>
+  <button type="button" data-tab="rel">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Relatórios
+  </button>
+</nav>
+
+<div class="overlay" id="alert" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="alert-title">
+    <div class="ic" id="alert-ic"></div>
+    <h2 id="alert-title" style="font-size:21px"></h2>
+    <p id="alert-text"></p>
+    <div class="bar" id="alert-bar"><div></div></div>
+    <button class="primary" id="alert-ok" type="button">Entendi</button>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="vendor/xlsx.mini.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
