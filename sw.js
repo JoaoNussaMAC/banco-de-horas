@@ -1,5 +1,5 @@
 // Guarda os arquivos do app para funcionar sem internet.
-const CACHE = 'banco-de-horas-v3';
+const CACHE = 'banco-de-horas-v4';
 const FILES = [
   './',
   './index.html',

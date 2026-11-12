@@ -280,7 +280,10 @@
     $('today-total').textContent = fmt(netMin(shownKey, now));
     $('t-in').textContent = d.in || '—';
     $('t-out').textContent = d.out || '—';
-    $('t-lunch').textContent = d.lunch === false ? 'não descontado' : '−1h';
+    $('p-lunch').checked = d.lunch !== false;
+    $('t-lunch').textContent = d.lunch === false ? 'Hoje sem almoço: conta as horas cheias' : 'Desligue nos dias em que não for almoçar';
+    $('today-sub').textContent = d.lunch === false ? 'trabalhadas hoje (sem desconto de almoço)' : 'trabalhadas hoje (já sem a 1h de almoço)';
+    pontoKey = shownKey;
 
     var st = monthStats(now.getFullYear(), now.getMonth(), now);
     var goalMin = state.settings.goal * 60;
@@ -293,6 +296,15 @@
     setBar($('goal-bar'), st.total / goalMin * 100, st.total >= goalMin ? 'done' : '');
   }
 
+  var pontoKey = null;
+  $('p-lunch').addEventListener('change', function () {
+    var k = pontoKey || keyOf(new Date());
+    var d = state.days[k] || {};
+    d.lunch = $('p-lunch').checked;
+    state.days[k] = d;
+    save(); render();
+    toast(d.lunch ? 'Almoço de hoje será descontado' : 'Hoje sem desconto de almoço');
+  });
   $('punch-btn').addEventListener('click', function () {
     var now = new Date();
     var ok = openKey(now);
@@ -303,6 +315,7 @@
       var tk = keyOf(now);
       var prev = state.days[tk];
       state.days[tk] = { in: hhmm(now), out: null, lunch: prev && prev.lunch === false ? false : true };
+      if (prev && prev.manual) state.days[tk].manual = prev.manual;
       toast('Entrada registrada às ' + state.days[tk].in);
     }
     if (navigator.vibrate) navigator.vibrate(15);

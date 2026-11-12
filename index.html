@@ -146,7 +146,7 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
       <span class="pill" id="status-pill">Fora do expediente</span>
       <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
         <span class="big num" id="today-total">0h 00</span>
-        <span class="muted" style="font-size:14px">trabalhadas hoje (já sem a 1h de almoço)</span>
+        <span class="muted" style="font-size:14px" id="today-sub">trabalhadas hoje (já sem a 1h de almoço)</span>
       </div>
       <button class="punch-btn" id="punch-btn" type="button">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
@@ -162,7 +162,7 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
     <div class="card">
       <span class="label">Hoje</span>
       <div class="row"><span>Entrada</span><span class="v num" id="t-in">—</span></div>
-      <div class="row muted"><span>Almoço (automático)</span><span class="num" id="t-lunch">−1h</span></div>
+      <label class="switch" for="p-lunch" style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px 0"><span style="display:flex;flex-direction:column"><span>Descontar 1h de almoço</span><small class="muted" style="font-size:13px" id="t-lunch">Desligue nos dias em que não for almoçar</small></span><input type="checkbox" id="p-lunch" checked></label>
       <div class="row"><span>Saída</span><span class="v num" id="t-out">—</span></div>
     </div>
   </section>
