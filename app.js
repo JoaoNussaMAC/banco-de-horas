@@ -110,7 +110,18 @@
     if (!d || !d.in || d.lunch === false) return 0;
     return Math.min(state.settings.lunchMin, grossMin(key, now));
   }
-  function netMin(key, now) { return grossMin(key, now) - lunchFor(key, now); }
+  // Horas lançadas à mão (sem horário de entrada/saída), em minutos.
+  function manualMin(key) { var d = state.days[key]; return d && d.manual ? d.manual : 0; }
+  function netMin(key, now) { return grossMin(key, now) - lunchFor(key, now) + manualMin(key); }
+  function worked(key, now) { return grossMin(key, now) > 0 || manualMin(key) > 0; }
+  function parseHM(v) { // "17:30", "17h30", "17,5" ou "17" → minutos
+    v = String(v || '').trim().replace(/\s/g, '').toLowerCase();
+    if (!v) return 0;
+    var m = v.match(/^(\d{1,3})(?:[:h](\d{1,2})?)?(?:min)?$/);
+    if (m) return (+m[1]) * 60 + (+(m[2] || 0));
+    var f = parseFloat(v.replace(',', '.'));
+    return isFinite(f) && f >= 0 ? Math.round(f * 60) : NaN;
+  }
 
   // Um ponto em aberto só vale para hoje ou ontem (turno que passa da meia-noite).
   function isOpen(key, now) {
@@ -133,8 +144,7 @@
     var n = daysInMonth(y, m);
     for (var i = 1; i <= n; i++) {
       var k = y + '-' + pad(m + 1) + '-' + pad(i);
-      var g = grossMin(k, now);
-      if (g > 0) { days++; total += netMin(k, now); lunch += lunchFor(k, now); }
+      if (worked(k, now)) { days++; total += netMin(k, now); lunch += lunchFor(k, now); }
     }
     return { total: total, lunch: lunch, days: days };
   }
@@ -313,7 +323,7 @@
     for (var i = 1; i <= n; i++) {
       var k = calY + '-' + pad(calM + 1) + '-' + pad(i);
       var wd = (first + i - 1) % 7;
-      var g = grossMin(k, now);
+      var g = worked(k, now) ? 1 : 0;
       var net = netMin(k, now);
       var hasNote = !!(state.notes[k] && state.notes[k].trim());
       var cls = 'day' + (wd === 0 || wd === 6 ? ' we' : '') + (k === tk ? ' today' : '') + (k === selKey ? ' sel' : '');
@@ -330,12 +340,13 @@
     var d = state.days[selKey] || {};
     $('day-title').textContent = (selKey === tk ? 'Hoje, ' : cap(WEEKDAYS[sd.getDay()]).split('-')[0] + ', ') + sd.getDate() + ' de ' + MONTHS[sd.getMonth()];
     var g2 = grossMin(selKey, now);
-    $('day-total').textContent = d.in ? (isOpen(selKey, now) ? d.in + ' → em andamento' : fmtLong(netMin(selKey, now)) + ' no dia') : 'sem ponto';
+    $('day-total').textContent = isOpen(selKey, now) ? d.in + ' → em andamento' : (worked(selKey, now) ? fmtLong(netMin(selKey, now)) + ' no dia' : 'sem ponto');
+    if (document.activeElement !== $('d-manual')) $('d-manual').value = d.manual ? Math.floor(d.manual / 60) + ':' + pad(d.manual % 60) : '';
     if (document.activeElement !== $('d-in')) $('d-in').value = d.in || '';
     if (document.activeElement !== $('d-out')) $('d-out').value = d.out || '';
     $('d-lunch').checked = d.lunch !== false;
     if (document.activeElement !== $('d-note')) $('d-note').value = state.notes[selKey] || '';
-    $('d-clear').hidden = !d.in;
+    $('d-clear').hidden = !d.in && !d.manual;
 
     // Próximas anotações
     var ups = Object.keys(state.notes).filter(function (k) { return k > tk && state.notes[k] && state.notes[k].trim(); }).sort().slice(0, 5);
@@ -372,9 +383,11 @@
     var prev = state.days[selKey] || {};
     if (!vin) {
       if (vout) { toast('Preencha a entrada primeiro.'); $('d-out').value = ''; }
-      delete state.days[selKey];
+      if (prev.manual) state.days[selKey] = { manual: prev.manual, lunch: prev.lunch !== false };
+      else delete state.days[selKey];
     } else {
       state.days[selKey] = { in: vin, out: vout || null, lunch: prev.lunch !== false };
+      if (prev.manual) state.days[selKey].manual = prev.manual;
     }
     save();
     render();
@@ -382,9 +395,18 @@
   }
   $('d-in').addEventListener('change', onTimeChange);
   $('d-out').addEventListener('change', onTimeChange);
+  $('d-manual').addEventListener('change', function () {
+    var v = parseHM($('d-manual').value);
+    if (isNaN(v)) { toast('Use o formato 17:30'); $('d-manual').value = ''; return; }
+    var d = state.days[selKey] || { lunch: true };
+    if (v > 0) d.manual = v; else delete d.manual;
+    if (!d.in && !d.manual) delete state.days[selKey]; else state.days[selKey] = d;
+    save(); render();
+    checkGoalReached(new Date());
+  });
   $('d-lunch').addEventListener('change', function () {
     var d = state.days[selKey];
-    if (!d) { toast('Registre a entrada desse dia primeiro.'); $('d-lunch').checked = true; return; }
+    if (!d || !d.in) { toast('Registre a entrada desse dia primeiro.'); $('d-lunch').checked = true; return; }
     d.lunch = $('d-lunch').checked;
     save(); render();
   });
@@ -398,7 +420,7 @@
     }, 400);
   });
   $('d-clear').addEventListener('click', function () {
-    if (!confirm('Apagar a entrada e a saída deste dia? A anotação continua.')) return;
+    if (!confirm('Apagar os horários e as horas lançadas deste dia? A anotação continua.')) return;
     delete state.days[selKey];
     save(); render();
   });
@@ -478,12 +500,13 @@
     if (!window.XLSX) { toast('Não consegui carregar o gerador de planilhas.'); return; }
     var now = new Date();
     var n = daysInMonth(repY, repM);
-    var rows = [['Data', 'Dia da semana', 'Entrada', 'Saída', 'Almoço', 'Total', 'Horas (decimal)', 'Anotação']];
+    var rows = [['Data', 'Dia da semana', 'Entrada', 'Saída', 'Almoço', 'Lançado à mão', 'Total', 'Horas (decimal)', 'Anotação']];
     for (var i = 1; i <= n; i++) {
       var k = repY + '-' + pad(repM + 1) + '-' + pad(i);
       var dt = parseKey(k);
       var d = state.days[k] || {};
       var g = grossMin(k, now);
+      var w = worked(k, now);
       var net = netMin(k, now);
       rows.push([
         pad(i) + '/' + pad(repM + 1) + '/' + repY,
@@ -491,8 +514,9 @@
         d.in || '',
         d.out || (d.in && isOpen(k, now) ? 'em andamento' : ''),
         g > 0 ? (d.lunch === false ? '0h 00' : fmt(lunchFor(k, now))) : '',
-        g > 0 ? fmt(net) : '',
-        g > 0 ? Math.round(net / 60 * 100) / 100 : '',
+        d.manual ? fmt(d.manual) : '',
+        w ? fmt(net) : '',
+        w ? Math.round(net / 60 * 100) / 100 : '',
         state.notes[k] || ''
       ]);
     }
@@ -501,14 +525,14 @@
     rows.push([]);
     rows.push(['Resumo de ' + MONTHS[repM] + ' ' + repY]);
     rows.push(['Dias trabalhados', st.days]);
-    rows.push(['Horas no mês', fmt(st.total), '', '', '', '', Math.round(st.total / 60 * 100) / 100]);
+    rows.push(['Horas no mês', fmt(st.total), '', '', '', '', '', Math.round(st.total / 60 * 100) / 100]);
     rows.push(['Almoço descontado', fmt(st.lunch)]);
     rows.push(['Meta', state.settings.goal + 'h']);
-    if (st.total >= goalMin) rows.push(['Horas extras', fmt(st.total - goalMin), '', '', '', '', Math.round((st.total - goalMin) / 60 * 100) / 100]);
-    else rows.push(['Falta para a meta', fmt(goalMin - st.total), '', '', '', '', Math.round((goalMin - st.total) / 60 * 100) / 100]);
+    if (st.total >= goalMin) rows.push(['Horas extras', fmt(st.total - goalMin), '', '', '', '', '', Math.round((st.total - goalMin) / 60 * 100) / 100]);
+    else rows.push(['Falta para a meta', fmt(goalMin - st.total), '', '', '', '', '', Math.round((goalMin - st.total) / 60 * 100) / 100]);
 
     var ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 9 }, { wch: 13 }, { wch: 9 }, { wch: 9 }, { wch: 15 }, { wch: 45 }];
+    ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 9 }, { wch: 13 }, { wch: 9 }, { wch: 13 }, { wch: 9 }, { wch: 15 }, { wch: 45 }];
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, cap(MONTHS[repM]).slice(0, 31));
     var out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
